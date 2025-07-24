@@ -27,8 +27,8 @@ services:
 
   api:
     build:
-      context: .
-      dockerfile: Dockerfile.api
+      context: ./api
+      dockerfile: Dockerfile
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./api:/app/api
@@ -45,8 +45,8 @@ services:
 
   worker:
     build:
-      context: .
-      dockerfile: Dockerfile.worker
+      context: ./worker
+      dockerfile: Dockerfile
     command: celery -A worker.tasks.celery_app worker --loglevel=info -c 1
     volumes:
       - ./worker:/app/worker
