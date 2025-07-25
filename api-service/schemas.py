@@ -11,6 +11,7 @@ class JobStatusResponse(BaseModel):
     id: uuid.UUID
     status: str
     created_at: datetime
+    files: List[FileStatus]
     download_url: Optional[str] = None
 
     class Config:
