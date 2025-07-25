@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from pydantic import BaseModel
-from typing import Optional
+from typing import List,Optional
 
 class JobCreatedResponse(BaseModel):
     job_id: uuid.UUID
