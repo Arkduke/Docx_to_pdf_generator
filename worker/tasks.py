@@ -7,7 +7,6 @@ from celery import Celery
 from api.database import SessionLocal
 from api import models, crud
 
-# Setup logging
 logger = logging.getLogger(__name__)
 
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
@@ -60,7 +59,6 @@ def create_zip_archive(conversion_results: list, job_id: str):
     try:
         logger.info(f"Starting zip process for job {job_id_uuid}")
         
-        # Filter out `None` results from failed conversions
         successful_filenames = [filename for filename in conversion_results if filename is not None]
         
         if not successful_filenames:
@@ -75,7 +73,6 @@ def create_zip_archive(conversion_results: list, job_id: str):
 
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for original_filename in successful_filenames:
-                # Construct the expected PDF filename
                 pdf_filename = os.path.splitext(original_filename)[0] + '.pdf'
                 pdf_path = os.path.join(job_result_dir, pdf_filename)
                 
