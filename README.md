@@ -1,156 +1,86 @@
-# DocX to PDF Converter - Railway Compatible
+# Docx to PDF Generator
 
-A microservices-based document conversion service that converts DOCX files to PDF format, designed for deployment on Railway.
+This project is a microservices-based application for converting DOCX files to PDF format. It consists of a web API for uploading files and a background worker to handle the conversion process.
 
-## 🏗️ Architecture
+## Architecture
 
-This application consists of two independent microservices:
+The application is composed of two main services:
 
-### API Service (`api-service/`)
-- **Technology**: FastAPI
-- **Purpose**: Handles HTTP requests, file uploads, and job management
-- **Storage**: Files stored in PostgreSQL database as BLOBs
-- **Communication**: Sends tasks to worker via Celery/Redis
+-   **`api-service`**: A FastAPI application that provides an endpoint for users to upload their `.docx` files. Once a file is received, it is saved, and a task is dispatched to a Celery queue for processing.
+-   **`worker-service`**: A Celery worker that listens for tasks from the queue. When a task is received, it uses LibreOffice to convert the specified DOCX file to a PDF.
 
-### Worker Service (`worker-service/`)
-- **Technology**: Celery + LibreOffice
-- **Purpose**: Performs DOCX to PDF conversion
-- **Processing**: Uses LibreOffice headless mode for conversion
-- **Storage**: Stores converted files back to PostgreSQL
+The two services communicate asynchronously using a Redis message broker for the Celery queue. A PostgreSQL database is used for storing metadata about the files and conversion tasks (though the provided files don't explicitly detail the database models).
 
-### Shared Components (`shared/`)
-- Database models and utilities
-- Celery configuration
-- CRUD operations
+## Technology Stack
 
-## 🚀 Deployment Options
+-   **Backend**: Python
+-   **API**: FastAPI
+-   **Asynchronous Task Queue**: Celery
+-   **Message Broker**: Redis
+-   **Database**: PostgreSQL (based on `psycopg2-binary` dependency)
+-   **File Conversion**: LibreOffice
+-   **Containerization**: Docker
 
-### Railway (Recommended)
-See [RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md) for detailed instructions.
+## Services
 
-### Local Testing
-```bash
-# Test the new structure locally
-docker-compose -f docker-compose.test.yml up
-```
+### API Service (`api-service`)
 
-### Traditional Docker
-```bash
-# Build API service
-docker build -f api-service/Dockerfile -t docx-api .
+-   **Framework**: FastAPI
+-   **Functionality**: Exposes an HTTP endpoint to accept `.docx` file uploads.
+-   **Dependencies**:
+    -   `fastapi`
+    -   `uvicorn`
+    -   `sqlalchemy`
+    -   `psycopg2-binary`
+    -   `pydantic`
+    -   `python-multipart`
+    -   `celery`
+    -   `redis`
 
-# Build Worker service  
-docker build -f worker-service/Dockerfile -t docx-worker .
-```
+### Worker Service (`worker-service`)
 
-## 📋 Prerequisites
+-   **Framework**: Celery
+-   **Functionality**: Consumes tasks from the Redis queue and performs the file conversion using a headless instance of LibreOffice.
+-   **Dependencies**:
+    -   `celery`
+    -   `redis`
+    -   `sqlalchemy`
+    -   `psycopg2-binary`
 
-- PostgreSQL database
-- Redis instance
-- Docker (for containerized deployment)
+## Deployment on Railway
 
-## 🔧 Environment Variables
+This project is configured for deployment on [Railway](https://railway.app/) using a single monorepo.
 
-### API Service
-```bash
-DATABASE_URL=postgresql://user:password@host:port/dbname
-CELERY_BROKER_URL=redis://host:port/0
-CELERY_RESULT_BACKEND=redis://host:port/0
-BASE_URL=https://your-domain.com
-```
+### Docker Configuration
 
-### Worker Service
-```bash
-DATABASE_URL=postgresql://user:password@host:port/dbname
-CELERY_BROKER_URL=redis://host:port/0
-CELERY_RESULT_BACKEND=redis://host:port/0
-```
+A single `Dockerfile` is used to build the Docker images for both the `api-service` and the `worker-service`. The `SERVICE_DIR` build argument is used to specify which service the image should be built for. This argument determines:
 
-## 📡 API Endpoints
+1.  Which `requirements.txt` file to use for installing Python dependencies.
+2.  Which command to run when the container starts, as defined in `entrypoint.sh`.
 
-### Submit Conversion Job
-```http
-POST /api/v1/jobs
-Content-Type: multipart/form-data
+### Railway Setup
 
-files: [DOCX files]
-```
+To deploy this project on Railway, you will need to create two separate services from the same repository:
 
-### Check Job Status
-```http
-GET /api/v1/jobs/{job_id}
-```
+1.  **API Service**:
+    -   **Build Path**: `/`
+    -   **Dockerfile**: `Dockerfile`
+    -   **Build Args**: `SERVICE_DIR=api-service`
+    -   **Start Command**: (Handled by `entrypoint.sh`)
 
-### Download Results
-```http
-GET /api/v1/jobs/{job_id}/download
-```
+2.  **Worker Service**:
+    -   **Build Path**: `/`
+    -   **Dockerfile**: `Dockerfile`
+    -   **Build Args**: `SERVICE_DIR=worker-service`
+    -   **Start Command**: (Handled by `entrypoint.sh`)
 
-## 🔄 Migration from Docker Compose
+You will also need to provision a **Redis** database and a **PostgreSQL** database in your Railway project and connect them to your services by setting the appropriate environment variables (e.g., database URLs, Redis URL).
 
-If you're migrating from the original docker-compose setup:
+### Entrypoint
 
-1. The new structure eliminates shared volumes
-2. Files are now stored in the database
-3. Services are completely independent
-4. Follow the Railway deployment guide
+The `entrypoint.sh` script is responsible for starting the correct application based on the `SERVICE_DIR` environment variable set during the Docker build.
 
-## 🧪 Testing
+-   If `SERVICE_DIR` is `api-service`, it starts the FastAPI application using `uvicorn`.
+-   If `SERVICE_DIR` is `worker-service`, it starts the Celery worker.
 
-```bash
-# Submit a test job
-curl -X POST "http://localhost:8000/api/v1/jobs" \
-  -H "Content-Type: multipart/form-data" \
-  -F "files=@test.docx"
-
-# Check job status (replace JOB_ID)
-curl "http://localhost:8000/api/v1/jobs/JOB_ID"
-
-# Download results
-curl "http://localhost:8000/api/v1/jobs/JOB_ID/download" -o results.zip
-```
-
-## 📊 Key Benefits
-
-- ✅ **Railway Compatible**: No docker-compose dependencies
-- ✅ **Independent Scaling**: Scale API and worker separately  
-- ✅ **No Shared Volumes**: Database-based file storage
-- ✅ **Cloud Native**: Uses external PostgreSQL and Redis
-- ✅ **Fault Tolerant**: Services can restart independently
-
-## 🛠️ Development
-
-### Local Development Setup
-1. Clone the repository
-2. Copy environment files: `cp api-service/.env.example api-service/.env`
-3. Update environment variables
-4. Run: `docker-compose -f docker-compose.test.yml up`
-
-### Project Structure
-```
-├── api-service/           # FastAPI service
-│   ├── main.py           # API endpoints
-│   ├── schemas.py        # Pydantic models
-│   ├── Dockerfile        # API container
-│   └── requirements.txt  # Python dependencies
-├── worker-service/        # Celery worker
-│   ├── tasks.py          # Conversion tasks
-│   ├── Dockerfile        # Worker container
-│   └── requirements.txt  # Python dependencies
-├── shared/               # Shared components
-│   ├── models.py         # Database models
-│   ├── database.py       # DB configuration
-│   └── crud.py           # Database operations
-└── RAILWAY_DEPLOYMENT.md # Deployment guide
-```
-
-## 🐛 Troubleshooting
-
-- **Database Connection**: Verify `DATABASE_URL` format
-- **Celery Issues**: Check Redis connection and worker logs
-- **LibreOffice**: Ensure worker container has LibreOffice installed
-- **File Size Limits**: PostgreSQL BLOB limits may affect large files
-
-## 📄 License
-
-[Add your license here]
+This setup allows for a streamlined build and deployment process from a single codebase.
